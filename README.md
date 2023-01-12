@@ -98,3 +98,6 @@ But now the implementation of these actions is done by the new class "Command" t
 
 About the modification in "Game.razor.cs", there is a "PawnController" object of the "Controller" class. Due to the extraction of the movement calculations, the accesses have been modified thanks to the implemented Getters and Setters.
 
+Note: Instead of a screenshot I have decided to use a gif because you need to see the movement of the Pawn on the stage to see its execution.
+
+![gif](./GIF/patternDesign.gif)

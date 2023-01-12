@@ -8,100 +8,93 @@ The idea was to modify the Controller class that contained the game actions to:
 - Move backward
 - Stop.
 
--> This
+The original Controller class performs both the Pawn movement calculations and the detection of the keys to perform the different actions described above.
+
+To implement this design pattern, I have extracted the motion calculations into a separate class called "Action".
+The Controller class now contains only the connections to detect keyboard and mouse movement and some Getters and Setters that "Game.razor.cs" needed access to.
 
 ```
-public partial class Controller : LayoutComponentBase, IController {
+public partial class Controller : LayoutComponentBase {
+        public Action action;
 
-        public double WindowWidth=1.0;
-        public double WindowHeight=1.0;
+        public MoveForwardCommand forward;
+        public MoveBackwardCommand backward;
+        public StopCommand stop;
 
-        public double MouseEffect=1.0;
-
-        public double BoomRate=1.0;
-
-        public double ScaleMovement {get; set;}
-
-      public void MouseMovement(double x, double y){
-
-            Coordinates2D mC = new Coordinates2D(x,y);
-            Coordinates2D delta;
-            delta = mC - this.mCoord;
-            this.mCoord = mC;
-
-            boomTarget = new Angles2D(boomTarget.Yaw + MouseEffect * delta.X,
-                    boomTarget.Pitch + MouseEffect * delta.Y);
-            boomAngles = boomAngles + BoomRate*(boomTarget-boomAngles);
-            
+        public Controller(){
+            action = new Action();
+            forward = new MoveForwardCommand();
+            backward = new MoveBackwardCommand();
+            stop = new StopCommand();
         }
-        public bool GamePlaying=false;
-        private Coordinates2D mCoord = new Coordinates2D();
-
-        private Angles2D boomAngles = new Angles2D();
-        private Angles2D boomTarget = new Angles2D();
-
-        private Vector3 MovementInput = new Vector3(0.0f,0.0f,0.0f);
 
         private void mouseEvent(MouseEventArgs e){
-             
             double x = e.ClientX;
             double y = e.ClientY;
-            x = x/WindowWidth;
-            y= y/WindowHeight;
 
-           MouseMovement(x,y);
+            x = x/action.WindowWidth;
+            y= y/action.WindowHeight;
+
+           action.MouseMovement(x,y);
         }
 
         private void keydownEvent(KeyboardEventArgs e){
-            Console.WriteLine("KeyDown");
-            double f = System.Math.PI/180;                        
-            double yaw = f*boomAngles.Yaw;
-            switch(e.Key){
-                case "w" :
-                    MovementInput.x = -(float)System.Math.Sin(yaw);
-                    MovementInput.z = -(float)System.Math.Cos(yaw);
-                    MovementInput.y=0.0f;
-                    MovementInput = this.ScaleMovement* MovementInput;
-                    break;
-                case "s":
-                    MovementInput.x = (float)System.Math.Sin(yaw);
-                    MovementInput.z = (float)System.Math.Cos(yaw);
-                    MovementInput.y=0.0f;
-                    MovementInput = this.ScaleMovement* MovementInput;
-                    break;
-                default:
-                    break;
-                    
+            if(e.Key == "w")
+                forward.execute(action);
 
-            }
+            if(e.Key == "s")
+                backward.execute(action);
         }
+
 
         private void keyupEvent(KeyboardEventArgs e){
-            Console.WriteLine("keyUp"); 
-            MovementInput.x = 0.0f;
-            MovementInput.y = 0.0f;
-            MovementInput.z= 0.0f;
+            stop.execute(action);
         }
-
-        public Coordinates2D GetMCoord(){
-            return this.mCoord;
-        }
-
-        public Angles2D GetBoomAngles(){
-            return this.boomAngles;
-        }
-
-        public Vector3 GetMovement(){
-            return this.MovementInput;
-        }
-
-        protected ElementReference ctrlDiv;
-        protected override async Task OnAfterRenderAsync(bool firstRender) {
-            if (firstRender)  {
-                this.boomAngles = new Angles2D();
-                this.ScaleMovement = 0.1;
-            }   
-            return;         
-        }      
+        
+        // Getters
+        ...
+        // Setters
+        ...
     }
 ```
+
+But now the implementation of these actions is done by the new class "Command" that by inheritance contains the child classes "MoveFordwardCommand" to move forward, "MoveBackwardsCommand" to move backward and the class "StopCommand" to stop the movement. All of them implement the execute() function which is passed an object of the "Action" class in order to work.
+
+```
+    public abstract class Command{
+        public abstract void execute(Action act);
+    }
+
+    public class MoveForwardCommand : Command{
+        public override void execute(Action act) {
+            double f = System.Math.PI/180;                        
+            double yaw = f*act.GetBoomAngles().Yaw;
+            act.MovementInput.x = -(float)System.Math.Sin(yaw);
+            act.MovementInput.z = -(float)System.Math.Cos(yaw);
+            act.MovementInput.y=0.0f;
+            act.MovementInput = 0.1f* act.MovementInput;
+        }
+    }
+
+    public class MoveBackwardCommand : Command{
+        public override void execute(Action act) {
+            double f = System.Math.PI/180;                        
+            double yaw = f*act.GetBoomAngles().Yaw;
+            act.MovementInput.x = (float)System.Math.Sin(yaw);
+            act.MovementInput.z = (float)System.Math.Cos(yaw);
+            act.MovementInput.y=0.0f;
+            act.MovementInput = 0.1f* act.MovementInput;
+        }
+    }
+
+    public class StopCommand : Command{
+        public override void execute(Action act) {
+            act.MovementInput.x = 0.0f;
+            act.MovementInput.y = 0.0f;
+            act.MovementInput.z= 0.0f;
+        }
+    }
+```
+
+About the modification in "Game.razor.cs", there is a "PawnController" object of the "Controller" class. Due to the extraction of the movement calculations, the accesses have been modified thanks to the implemented Getters and Setters.
+
